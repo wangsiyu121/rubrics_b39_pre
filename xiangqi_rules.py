@@ -43,7 +43,8 @@ class XiangqiRules:
         forward = 1 if color == "black" else -1
 
         # Check if soldier has crossed the river
-        crossed_river = (color == "black" and start_row >= 6) or (color == "red" and start_row <= 3)
+        # River is between row 4 and 5
+        crossed_river = (color == "black" and start_row >= 5) or (color == "red" and start_row <= 4)
 
         if crossed_river:
             # Can move forward or sideways, but only one step
@@ -92,7 +93,10 @@ class XiangqiRules:
         col_diff = end_col - start_col
 
         # Elephants can't cross the river
-        if color == "black" and end_row >= 4 or color == "red" and end_row <= 5:
+        # Black (top) 0-4, Red (bottom) 5-9
+        if color == "black" and end_row > 4:
+            return False
+        if color == "red" and end_row < 5:
             return False
 
         # Elephants move diagonally 2 spaces
@@ -219,8 +223,6 @@ class XiangqiRules:
         valid_moves = []
         for row in range(10):
             for col in range(9):
-                if row == 4 or row == 5:
-                    continue  # Skip river rows
                 if XiangqiRules.is_valid_move(board, piece_type, color, start, (row, col)):
                     valid_moves.append((row, col))
         return valid_moves
