@@ -10,7 +10,7 @@ BOARD_WIDTH = 9  # 9 columns (files)
 BOARD_HEIGHT = 10  # 10 rows (ranks) - but row 4 and 5 form the river
 SQUARE_SIZE = 60
 WINDOW_WIDTH = BOARD_WIDTH * SQUARE_SIZE
-WINDOW_HEIGHT = (BOARD_HEIGHT - 1) * SQUARE_SIZE + 40  # -1 because river takes no space
+WINDOW_HEIGHT = BOARD_HEIGHT * SQUARE_SIZE + 40
 
 # Colors
 WHITE = (255, 255, 255)
@@ -67,9 +67,6 @@ class XiangqiGame:
         return board
 
     def is_valid_move(self, piece_type, color, start, end):
-        # Can't move to river rows
-        if end[0] == 4 or end[0] == 5:
-            return False
         return XiangqiRules.is_valid_move(self.board, piece_type, color, start, end)
 
     def get_valid_moves(self, piece_type, color, start):
@@ -181,7 +178,7 @@ class XiangqiGUI:
         board_offset_y = 40
 
         # Draw the river between rows 4 and 5
-        river_y = 4 * SQUARE_SIZE + board_offset_y
+        river_y = 4 * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
         river_rect = pygame.Rect(0, river_y, WINDOW_WIDTH, SQUARE_SIZE)
         pygame.draw.rect(self.screen, BLUE, river_rect)
 
@@ -200,24 +197,34 @@ class XiangqiGUI:
             self.screen.blit(river_text, (WINDOW_WIDTH // 2 - 25, river_y + SQUARE_SIZE // 2 - 10))
 
         # Draw grid lines
+        # Horizontal lines
         for row in range(BOARD_HEIGHT):
-            if row == 4 or row == 5:
-                continue  # Skip river rows
-
-             # Adjust y position - rows after river are shifted up
-
-            if row < 4:
-                y = row * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
-            else:
-                y = (row - 1) * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
-
-
+            y = row * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
             pygame.draw.line(self.screen, BLACK, (SQUARE_SIZE // 2, y),
                                       (WINDOW_WIDTH - SQUARE_SIZE // 2, y), 2)
+        
+        # Vertical lines
+        # Top half (0-4)
         for col in range(BOARD_WIDTH):
             x = col * SQUARE_SIZE + SQUARE_SIZE // 2
-            pygame.draw.line(self.screen, BLACK, (x, SQUARE_SIZE // 2 + board_offset_y),
-                                    (x, WINDOW_HEIGHT - SQUARE_SIZE // 2), 2)
+            top_y = SQUARE_SIZE // 2 + board_offset_y
+            mid_y = 4 * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
+            pygame.draw.line(self.screen, BLACK, (x, top_y), (x, mid_y), 2)
+            
+        # Bottom half (5-9)
+        for col in range(BOARD_WIDTH):
+            x = col * SQUARE_SIZE + SQUARE_SIZE // 2
+            mid_y = 5 * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
+            bot_y = 9 * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
+            pygame.draw.line(self.screen, BLACK, (x, mid_y), (x, bot_y), 2)
+            
+        # Side lines crossing river
+        for col in [0, 8]:
+             x = col * SQUARE_SIZE + SQUARE_SIZE // 2
+             y4 = 4 * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
+             y5 = 5 * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
+             pygame.draw.line(self.screen, BLACK, (x, y4), (x, y5), 2)
+
         # Draw palaces (3x3 areas in the center of each side)
         palace_x = 3 * SQUARE_SIZE + SQUARE_SIZE // 2
         palace_width = 2 * SQUARE_SIZE
@@ -233,7 +240,7 @@ class XiangqiGUI:
                          (palace_x, palace_y_top + palace_height), 2)
 
         # Red palace (bottom)
-        palace_y_bottom = 6 * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y  # Rows 7,8,9 visually
+        palace_y_bottom = 7 * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y  # Rows 7,8,9 (index 7 to 9)
 
         # Draw palace diagonals for red
         pygame.draw.line(self.screen, GOLD, (palace_x, palace_y_bottom),
@@ -256,20 +263,14 @@ class XiangqiGUI:
         if self.game.selected_piece:
             row, col = self.game.selected_piece
             x = col * SQUARE_SIZE
-            if row < 4:
-                y = row * SQUARE_SIZE + board_offset_y
-            else:
-                y = (row - 1) * SQUARE_SIZE + board_offset_y
+            y = row * SQUARE_SIZE + board_offset_y
             pygame.draw.rect(self.screen, YELLOW, (x, y, SQUARE_SIZE, SQUARE_SIZE), 3)
 
         # Highlight valid moves
         for move in self.game.valid_moves:
             row, col = move
             x = col * SQUARE_SIZE + SQUARE_SIZE // 2
-            if row < 4:
-                y = row * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
-            else:
-                y = (row - 1) * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
+            y = row * SQUARE_SIZE + SQUARE_SIZE // 2 + board_offset_y
             pygame.draw.circle(self.screen, GREEN, (x, y), SQUARE_SIZE // 4, 3)
 
         pygame.display.flip()
@@ -287,32 +288,29 @@ class XiangqiGUI:
 
         for row, col in marker_positions:
             x = col * SQUARE_SIZE + SQUARE_SIZE // 2
-            # Adjust y for visual position
-            # Skip river rows
-            if row == 4 or row == 5:
-                continue
-            # Adjust y for visual position
-            if row < 4:
-                y = row * SQUARE_SIZE + SQUARE_SIZE // 2 + offset_y
-            else:
-                y = (row - 1) * SQUARE_SIZE + SQUARE_SIZE // 2 + offset_y
+            y = row * SQUARE_SIZE + SQUARE_SIZE // 2 + offset_y
 
             # Draw small corner markers
             marker_size = 5
             marker_offset = 15
 
-            # Don't draw markers that would go off the board
+            # Standard Xiangqi markers logic:
             corners = []
-            if col > 0 and row > 0:
+            # Check valid corners
+            if col > 0: # Left side
                 corners.append((-1, -1))  # top-left
-            if col < 8 and row > 0:
-                corners.append((1, -1))  # top-right
-            if col > 0 and row < 9:
-                corners.append((-1, 1))  # bottom-left
-            if col < 8 and row < 9:
-                corners.append((1, 1))  # bottom-right
-
+                corners.append((-1, 1))   # bottom-left
+            if col < 8: # Right side
+                corners.append((1, -1))   # top-right
+                corners.append((1, 1))    # bottom-right
+            
+            final_corners = []
             for dx, dy in corners:
+                 if col == 0 and dx == -1: continue
+                 if col == 8 and dx == 1: continue
+                 final_corners.append((dx, dy))
+
+            for dx, dy in final_corners:
                 # Draw L-shaped corner
                 start_x = x + dx * marker_offset
                 start_y = y + dy * marker_offset
@@ -367,18 +365,11 @@ class XiangqiGUI:
                     else:
                         # Handle board clicks
                         board_y = y - 40  # Account for menu bar
-                        col = x // SQUARE_SIZE
-                        # Convert visual position to board row
-                        visual_row = board_y // SQUARE_SIZE
+                        
+                        col = int(round((x - SQUARE_SIZE // 2) / SQUARE_SIZE))
+                        row = int(round((board_y - SQUARE_SIZE // 2) / SQUARE_SIZE))
 
-                        if visual_row < 4:
-                            row = visual_row
-                        elif visual_row == 4:
-                            continue  # Click on river, ignore
-                        else:
-                            row = visual_row + 1  # Account for river gap
-
-                        if 0 <= row < 10 and row != 4 and row != 5 and 0 <= col < BOARD_WIDTH:
+                        if 0 <= row < BOARD_HEIGHT and 0 <= col < BOARD_WIDTH:
                             if self.game.selected_piece:
                                 start_row, start_col = self.game.selected_piece
                                 piece = self.game.board[start_row][start_col]
